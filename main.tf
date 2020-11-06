@@ -1,11 +1,27 @@
+data google_project current {
+
+}
+
 resource random_id name_suffix {
   byte_length = 2
   keepers = {
-    machine_type = sha1(var.machine_type)
-    cloud_init_config = sha1(yamlencode(local.cloud_init_config))
-    disk_size = sha1(var.disk_size)
-    disk_type = sha1(var.disk_type)
-    zone = sha1(var.zone)
+    machine_type = var.machine_type
+    disk_size = var.disk_size
+    disk_type = var.disk_type
+    zone = var.zone
+    write_to_stackdriver = var.write_to_stackdriver
+  }
+}
+
+resource google_compute_firewall allow_http {
+  name = google_compute_instance.prometheus.name
+  network = "default"
+  source_ranges = ["0.0.0.0/0"]
+  target_tags = [local.instance_name]
+
+  allow {
+    protocol = "TCP"
+    ports = ["9090"]
   }
 }
 
@@ -19,10 +35,10 @@ resource google_project_iam_member monitoring_metricWriter {
 }
 
 resource google_compute_instance prometheus {
-  name = var.name != null ? var.name : "${var.name_prefix}${random_id.name_suffix.hex}"
+  name = local.instance_name
   machine_type = var.machine_type
   labels = var.labels
-  tags = var.tags
+  tags = concat([local.instance_name], var.tags)
   zone = var.zone
   allow_stopping_for_update = true
 

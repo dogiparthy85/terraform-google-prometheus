@@ -7,7 +7,7 @@ output instance_name {
 }
 
 output instance_address {
-  value = google_compute_instance.prometheus.network_interface.access_config[0].nat_ip
+  value = google_compute_instance.prometheus.network_interface[0].access_config[0].nat_ip
 }
 
 output service_account_email {
