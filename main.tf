@@ -2,22 +2,15 @@ data google_project current {
 
 }
 
-resource random_id name_suffix {
-  byte_length = 2
-  keepers = {
-    machine_type = var.machine_type
-    disk_size = var.disk_size
-    disk_type = var.disk_type
-    zone = var.zone
-    write_to_stackdriver = var.write_to_stackdriver
-  }
+resource random_id network_tag {
+  byte_length = 4
 }
 
 resource google_compute_firewall allow_http {
-  name = google_compute_instance.prometheus.name
+  name = "${var.name}-http"
   network = "default"
   source_ranges = ["0.0.0.0/0"]
-  target_tags = [local.instance_name]
+  target_tags = [local.network_tag]
 
   allow {
     protocol = "TCP"
@@ -26,7 +19,7 @@ resource google_compute_firewall allow_http {
 }
 
 resource google_service_account prometheus {
-  account_id = "prometheus-${random_id.name_suffix.hex}"
+  account_id = var.name
 }
 
 resource google_project_iam_member monitoring_metricWriter {
@@ -34,11 +27,19 @@ resource google_project_iam_member monitoring_metricWriter {
   role = "roles/monitoring.metricWriter"
 }
 
+resource google_compute_disk data {
+  count = var.data_disk_enabled ? 1 : 0
+  name = "${var.name}-data"
+  size = var.data_disk_size
+  type = var.data_disk_type
+  zone = var.zone
+}
+
 resource google_compute_instance prometheus {
-  name = local.instance_name
+  name = var.name
   machine_type = var.machine_type
   labels = var.labels
-  tags = concat([local.instance_name], var.tags)
+  tags = concat([local.network_tag], var.tags)
   zone = var.zone
   allow_stopping_for_update = true
 
@@ -59,6 +60,14 @@ resource google_compute_instance prometheus {
     }
   }
 
+  dynamic "attached_disk" {
+    for_each = google_compute_disk.data
+    content {
+      source = attached_disk.value.self_link
+      device_name = attached_disk.value.name
+    }
+  }
+
   network_interface {
     network = "default"
 
@@ -69,6 +78,4 @@ resource google_compute_instance prometheus {
       }
     }
   }
-
-  depends_on = [random_id.name_suffix]
 }
